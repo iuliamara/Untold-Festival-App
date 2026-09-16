@@ -1,0 +1,10 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Pre-install dependencies to utilize Docker build layer caching
+COPY package.json package-lock.json* ./
+RUN npm install
+
+# Source files will be mounted at runtime via docker-compose
+CMD ["npm", "run", "dev"]

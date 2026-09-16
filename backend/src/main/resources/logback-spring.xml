@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Structured JSON on stdout: Docker captures container stdout, Promtail tails it and ships
+         it to Loki, and Grafana's LogQL can query individual JSON fields (level, logger, message)
+         instead of grepping plain text across every container. -->
+    <appender name="STDOUT_JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"service":"untold-backend"}</customFields>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT_JSON"/>
+    </root>
+
+    <!-- Keep Hibernate SQL logging at the level application.properties already requests. -->
+    <logger name="org.hibernate.SQL" level="INFO"/>
+</configuration>

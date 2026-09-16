@@ -1,0 +1,18 @@
+FROM eclipse-temurin:17-jdk-alpine
+
+WORKDIR /app
+
+# Pre-download all Maven dependencies into an image layer cache.
+# This layer is only rebuilt when pom.xml changes, not on every source change.
+COPY pom.xml ./
+COPY .mvn .mvn
+COPY mvnw ./
+
+# Ensure line endings are LF for execution inside Alpine container
+RUN tr -d '\r' < mvnw > mvnw.tmp && mv mvnw.tmp mvnw && chmod +x mvnw
+
+RUN ./mvnw dependency:go-offline -q
+
+# Source code is mounted via volume at runtime (docker-compose volumes).
+CMD ["./mvnw", "spring-boot:run", "-T", "1C", "-DskipTests", \
+     "-Dspring-boot.run.jvmArguments=-XX:TieredStopAtLevel=1 -noverify"]

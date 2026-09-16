@@ -1,0 +1,135 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap');
+
+:root {
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Outfit', sans-serif;
+
+  /* Colors */
+  --bg-primary: #F8F6FC;
+  --bg-sidebar: #F5EEFA;
+  --bg-sidebar-active: rgba(93, 63, 211, 0.08);
+  
+  --purple-primary: #5D3FD3;
+  --purple-medium: #8A72EB;
+  --purple-light: #EBE5FC;
+  --purple-dark: #2F1160;
+  
+  --indigo-dark: #1E1B4B;
+  --coral-accent: #FF6F61;
+  --coral-light: #FFEBE9;
+  
+  --success: #10B981;
+  --success-bg: #D1FAE5;
+  --warning: #F59E0B;
+  --warning-bg: #FEF3C7;
+  --danger: #EF4444;
+  --danger-bg: #FEE2E2;
+
+  --text-main: #1A1625;
+  --text-muted: #6B647A;
+  --text-light: #9B95A7;
+  
+  --border-light: rgba(93, 63, 211, 0.08);
+  --border-hover: rgba(93, 63, 211, 0.16);
+  
+  --shadow-sm: 0 2px 8px rgba(93, 63, 211, 0.02);
+  --shadow-md: 0 8px 24px rgba(93, 63, 211, 0.04);
+  --shadow-lg: 0 16px 40px rgba(93, 63, 211, 0.08);
+  
+  --glass-bg: rgba(255, 255, 255, 0.9);
+  --glass-border: rgba(93, 63, 211, 0.06);
+  
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: all 0.15s ease;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(93, 63, 211, 0.15);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(93, 63, 211, 0.3);
+}
+
+/* Glassmorphism & Reusable Classes */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-md);
+  transition: var(--transition-smooth);
+}
+
+.glass-card:hover {
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-hover);
+}
+
+.title-heading {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--indigo-dark);
+}
+
+/* Micro-animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.pulse-hover:hover {
+  animation: pulse-subtle 1.5s infinite ease-in-out;
+}

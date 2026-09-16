@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --music-intensity: 0;
+  }
+  body {
+    @apply bg-background text-on-background min-h-screen;
+    background: radial-gradient(circle at top right, rgba(112, 0, 255, calc(0.15 + var(--music-intensity) * 0.4)) 0%, rgba(18, 18, 31, 0) calc(50% + var(--music-intensity) * 30%)),
+                radial-gradient(circle at bottom left, rgba(0, 219, 233, calc(0.1 + var(--music-intensity) * 0.4)) 0%, rgba(18, 18, 31, 0) calc(50% + var(--music-intensity) * 30%));
+    background-color: #12121f;
+    background-attachment: fixed;
+  }
+}
+
+@layer utilities {
+  .glow-effect { box-shadow: 0 0 15px 0 rgba(0, 219, 233, 0.3); }
+  .glow-effect:hover { box-shadow: 0 0 25px 0 rgba(0, 219, 233, 0.6); }
+  .glass-panel { background: rgba(18, 18, 31, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+  .glass-panel-active { border-color: rgba(0, 219, 233, 0.5); }
+  .text-glow { text-shadow: 0 0 10px rgba(209, 188, 255, 0.5); }
+  .gradient-text { background: linear-gradient(90deg, #d1bcff, #00dbe9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+}
