@@ -6,7 +6,7 @@ export const Home: React.FC = () => {
   const { t } = useI18n();
 
   const calculateTimeLeft = () => {
-    const targetDate = new Date('2026-08-06T16:00:00');
+    const targetDate = new Date('2026-12-06T16:00:00');
     const now = new Date();
     const difference = targetDate.getTime() - now.getTime();
 

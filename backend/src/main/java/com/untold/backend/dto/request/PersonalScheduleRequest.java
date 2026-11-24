@@ -15,6 +15,8 @@ public class PersonalScheduleRequest implements BaseRequest {
     private String startTime;
     private String endTime;
     private Integer festivalDay;
+    private Integer alarmOffset;
+    private String clientRequestId;
 
     @Override
     public RequestType getRequestType() {

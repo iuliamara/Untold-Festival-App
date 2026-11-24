@@ -35,7 +35,7 @@ public class AuthController {
             user.setUsername(request.getUsername());
             user.setEmail(request.getEmail());
             user.setPassword(request.getPassword());
-            user.setUserType(UserType.valueOf(request.getUserType()));
+            user.setUserType(UserType.ATTENDEE);
 
             User createdUser = authService.register(user);
 

@@ -1,3 +1,8 @@
+> **Historical design specification — original source preserved.** Recovered from Git HEAD. This document may describe requirements, examples or claims not implemented in the current application. It is not current product documentation or evidence of official affiliation. See [current specifications](../functional-specifications.md). Original language, headings, diagrams and examples are retained; only moved links and credential examples were adjusted.
+
+> The original Romanian text is retained for fidelity. A [complete English translation](6_rate_limiting_and_observability.en.md) accompanies it.
+
+<!-- historical-source-body -->
 # Volume 6: Rate Limiting, Logare Centralizată & Monitorizare
 ## Bucket4j + Actuator/Prometheus + Loki/Promtail + Grafana
 
@@ -24,9 +29,9 @@ continuu cu 5 token-uri/secundă. Fiecare cerere HTTP către `/api/tickets/**` c
 bucket-ul e gol, cererea primește `429` fără să mai ajungă la baza de date.
 
 ### Unde e implementat
-- [`RateLimitingFilter.java`](../backend/src/main/java/com/untold/backend/security/RateLimitingFilter.java)
+- [`RateLimitingFilter.java`](../../backend/src/main/java/com/untold/backend/security/RateLimitingFilter.java)
   — filtrul propriu-zis.
-- [`RateLimitingConfig.java`](../backend/src/main/java/com/untold/backend/configs/RateLimitingConfig.java)
+- [`RateLimitingConfig.java`](../../backend/src/main/java/com/untold/backend/configs/RateLimitingConfig.java)
   — îl înregistrează ca filtru servlet brut (`FilterRegistrationBean`), **nu** ca filtru Spring
   Security, cu prioritatea cea mai mare posibilă (`Ordered.HIGHEST_PRECEDENCE`).
 
@@ -73,10 +78,10 @@ container separat) descoperă automat *toate* containerele din `docker-compose` 
 căuta/filtra dintr-un singur loc, fără să mai dai `docker compose logs` pe fiecare serviciu separat.
 
 ### Unde e implementat
-- [`logback-spring.xml`](../backend/src/main/resources/logback-spring.xml) — encoder
+- [`logback-spring.xml`](../../backend/src/main/resources/logback-spring.xml) — encoder
   `LogstashEncoder`, transformă fiecare linie de log într-un obiect JSON (`timestamp`, `level`,
   `logger_name`, `message`, `thread_name`, plus câmpul custom `service: "untold-backend"`).
-- [`monitoring/promtail/promtail-config.yml`](../monitoring/promtail/promtail-config.yml) —
+- [`monitoring/promtail/promtail-config.yml`](../../monitoring/promtail/promtail-config.yml) —
   configurare `docker_sd_configs`: Promtail interoghează `/var/run/docker.sock` ca să afle ce
   containere rulează, le etichetează cu `container: <nume>`, și tail-ează stdout-ul fiecăruia.
 - `docker-compose.yml` — servicii noi `loki` și `promtail`.
@@ -118,12 +123,12 @@ timp. **Grafana** citește din Prometheus și desenează grafice.
 - `application.properties` — expune explicit `health,info,metrics,prometheus`, activează
   histograme + percentile (p50/p95/p99) pentru latența HTTP, numește pool-ul HikariCP
   (`UntoldHikariPool`) ca să fie ușor de găsit în query-uri.
-- [`SecurityConfig.java`](../backend/src/main/java/com/untold/backend/configs/SecurityConfig.java)
+- [`SecurityConfig.java`](../../backend/src/main/java/com/untold/backend/configs/SecurityConfig.java)
   — `/actuator/**` adăugat la `permitAll` (altfel Prometheus primea `403` la fiecare scrape, pentru
   că orice rută din afara `/api/**` cerea autentificare).
-- [`monitoring/prometheus/prometheus.yml`](../monitoring/prometheus/prometheus.yml) — configurează
+- [`monitoring/prometheus/prometheus.yml`](../../monitoring/prometheus/prometheus.yml) — configurează
   job-ul de scrape către `backend:8080/actuator/prometheus`.
-- [`monitoring/grafana/provisioning/`](../monitoring/grafana/provisioning/) — Grafana pornește deja
+- [`monitoring/grafana/provisioning/`](../../monitoring/grafana/provisioning) — Grafana pornește deja
   cu sursele de date (Prometheus + Loki) și un dashboard ("Untold Backend Overview") gata create,
   fără click-uri manuale în UI.
 - `docker-compose.yml` — servicii noi `prometheus` și `grafana`.
@@ -159,10 +164,10 @@ curl -s http://localhost:9090/api/v1/targets | grep -o '"health":"[^"]*"'
 # -> "health":"up"
 
 # 3. Grafana are ambele surse de date + dashboard-ul:
-curl -s -u admin:admin http://localhost:3000/api/datasources
-curl -s -u admin:admin http://localhost:3000/api/search
+curl -s -u "<local-monitoring-user>:<local-monitoring-password>" http://localhost:3000/api/datasources
+curl -s -u "<local-monitoring-user>:<local-monitoring-password>" http://localhost:3000/api/search
 ```
-Vizual: deschide **http://localhost:3000** (user `admin` / parolă `admin`, sau direct fără login —
+Vizual: deschide **http://localhost:3000** (user `<local-credential>` / parolă `<local-credential>`, sau direct fără login —
 anonim e activat) → dashboard-ul **"Untold Backend Overview"** e deja acolo.
 
 ---
@@ -176,7 +181,7 @@ docker compose up -d
 | Serviciu | Port | Ce vezi |
 |---|---|---|
 | Prometheus | `http://localhost:9090` | UI brut de interogare metrici (Status → Targets ca să confirmi că backend-ul e "UP") |
-| Grafana | `http://localhost:3000` | Dashboard-ul vizual (`admin`/`admin`) |
+| Grafana | `http://localhost:3000` | Dashboard-ul vizual (`<local-credential>`/`<local-credential>`) |
 | Loki | `http://localhost:3100` | API intern, nu are UI propriu — se accesează prin Grafana |
 | Backend Actuator | `http://localhost:8080/actuator/prometheus` | Metricile brute, format text Prometheus |
 

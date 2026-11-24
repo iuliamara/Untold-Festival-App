@@ -1,3 +1,6 @@
+> **Historical design specification — original source preserved.** Recovered from Git HEAD. This document may describe requirements, examples or claims not implemented in the current application. It is not current product documentation or evidence of official affiliation. See [current specifications](../functional-specifications.md). Original language, headings, diagrams and examples are retained; only moved links and credential examples were adjusted.
+
+<!-- historical-source-body -->
 # Volume 5: Personal Schedule Feature
 ## Persistent per-user festival schedule, clash detection, day organization & alarm notifications
 

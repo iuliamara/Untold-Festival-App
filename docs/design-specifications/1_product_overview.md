@@ -1,3 +1,6 @@
+> **Historical design specification — original source preserved.** Recovered from Git HEAD. This document may describe requirements, examples or claims not implemented in the current application. It is not current product documentation or evidence of official affiliation. See [current specifications](../functional-specifications.md). Original language, headings, diagrams and examples are retained; only moved links and credential examples were adjusted.
+
+<!-- historical-source-body -->
 # Volume 1: Product Overview & Vision
 ## Untold Ticket & Lineup Manager ("Untold Connect")
 

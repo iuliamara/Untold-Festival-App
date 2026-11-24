@@ -29,9 +29,38 @@ const emptyForm = {
   phoneNumber: '',
 };
 
+const getAuthHeaders = () => {
+  const token = sessionStorage.getItem('untold_token');
+  if (!token) {
+    throw new Error('Your admin session is missing. Please sign out and sign in again.');
+  }
+
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/json',
+  };
+};
+
+const readPersonsResponse = async <T,>(response: Response, fallbackMessage: string): Promise<T> => {
+  if (response.status === 401) {
+    throw new Error('Your session has expired or is invalid. Please sign out and sign in again.');
+  }
+  if (response.status === 403) {
+    throw new Error('Access denied. An active administrator session is required. Please sign out and sign in again.');
+  }
+
+  const result = await response.json().catch(() => null);
+  if (!response.ok || result?.type !== 'SUCCESS') {
+    throw new Error(result?.message || `${fallbackMessage}${response.ok ? '' : ` (HTTP ${response.status})`}`);
+  }
+
+  return result.data as T;
+};
+
 export const Persons = () => {
   const [persons, setPersons] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -44,13 +73,15 @@ export const Persons = () => {
   const fetchPersons = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:8080/api/persons');
-      const data = await res.json();
-      if (data && data.type === 'SUCCESS') {
-        setPersons(data.data);
-      }
+      setError(null);
+      const res = await fetch('http://localhost:8080/api/persons', {
+        headers: getAuthHeaders(),
+      });
+      const records = await readPersonsResponse<Person[]>(res, 'Failed to load attendee records.');
+      setPersons(records);
     } catch (err) {
       console.error('Failed to fetch persons from backend', err);
+      setError(err instanceof Error ? err.message : 'Failed to load attendee records.');
     } finally {
       setLoading(false);
     }
@@ -93,18 +124,14 @@ export const Persons = () => {
         : 'http://localhost:8080/api/persons';
       const res = await fetch(url, {
         method: editingId ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
-      const data = await res.json();
-      if (data && data.type === 'SUCCESS') {
-        setShowModal(false);
-        fetchPersons();
-      } else {
-        alert('Failed to save person: ' + (data.message || 'Unknown error'));
-      }
+      await readPersonsResponse<Person>(res, 'Failed to save person.');
+      setShowModal(false);
+      await fetchPersons();
     } catch (err) {
-      alert('Error saving person: ' + err);
+      alert(err instanceof Error ? err.message : 'Failed to save person.');
     } finally {
       setSaving(false);
     }
@@ -113,15 +140,14 @@ export const Persons = () => {
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this person record?')) return;
     try {
-      const res = await fetch(`http://localhost:8080/api/persons/${id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data && data.type === 'SUCCESS') {
-        fetchPersons();
-      } else {
-        alert('Failed to delete person: ' + (data.message || 'Unknown error'));
-      }
+      const res = await fetch(`http://localhost:8080/api/persons/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      await readPersonsResponse<null>(res, 'Failed to delete person.');
+      await fetchPersons();
     } catch (err) {
-      alert('Error deleting person: ' + err);
+      alert(err instanceof Error ? err.message : 'Failed to delete person.');
     }
   };
 
@@ -215,13 +241,17 @@ export const Persons = () => {
       <div style={styles.card} className="glass-card">
         <div style={styles.cardHeader}>
           <h4 style={styles.cardTitle}>All Records</h4>
-          <button style={styles.filterBtn} onClick={fetchPersons}>Refresh</button>
+          <button style={styles.filterBtn} onClick={fetchPersons} disabled={loading}>Refresh</button>
         </div>
 
         {loading ? (
           <div style={{ padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
             <RefreshCw size={24} className="animate-spin" style={{ color: 'var(--purple-primary)' }} />
             <span style={{ fontSize: '14px', color: 'var(--text-light)', fontWeight: 600 }}>Loading records from database...</span>
+          </div>
+        ) : error ? (
+          <div role="alert" style={styles.errorMessage}>
+            {error}
           </div>
         ) : (
           <GenericTable
@@ -426,6 +456,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: '600',
     color: 'var(--text-muted)',
     cursor: 'pointer',
+  },
+  errorMessage: {
+    padding: '16px',
+    borderRadius: '10px',
+    backgroundColor: '#FFF2F2',
+    color: 'var(--danger)',
+    fontSize: '14px',
   },
   avatarLabel: {
     width: '32px',

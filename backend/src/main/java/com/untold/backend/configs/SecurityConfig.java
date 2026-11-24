@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import com.untold.backend.security.JwtAuthenticationFilter;
@@ -41,9 +42,19 @@ public class SecurityConfig {
             .cors(org.springframework.security.config.Customizer.withDefaults()) // Uses the global CorsFilter bean
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // No sessions
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/users/me/**").authenticated() // GDPR data export and other self-service routes require a valid JWT
-                .requestMatchers("/api/favorites/**").authenticated() // Favorites are per-user, require a valid JWT
-                .requestMatchers("/api/**").permitAll()
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers(HttpMethod.GET,
+                    "/api/artists", "/api/artists/**",
+                    "/api/performances", "/api/performances/**",
+                    "/api/festival/current-day", "/api/map/active",
+                    "/api/tickets/tiers", "/api/flash-sale/status",
+                    "/api/crowd-reports", "/api/crowd-reports/**").permitAll()
+                .requestMatchers("/api/users/me/**").authenticated()
+                .requestMatchers("/api/admin/**", "/api/users/**", "/api/persons/**",
+                    "/api/map/**", "/api/crowd-reports/**", "/api/artists/**").hasRole("ADMIN")
+                .requestMatchers("/api/favorites/**", "/api/my-schedule/**").authenticated()
+                .requestMatchers("/api/tickets/validate-qr", "/api/tickets/stats/**").hasRole("ADMIN")
+                .requestMatchers("/api/tickets/**", "/api/payment/**", "/api/flash-sale/**").authenticated()
                 .requestMatchers("/uploads/**").permitAll() // Allow public access to uploaded map images
                 .requestMatchers("/actuator/**").permitAll() // Prometheus scraping + health checks
                 .requestMatchers("/ws/**").permitAll() // Allow all SockJS/WebSocket upgrade routes
@@ -65,12 +76,20 @@ public class SecurityConfig {
             "http://localhost:5176",
             "http://localhost:5177",
             "http://localhost:5178",
+            "http://localhost:8100",
+            "http://localhost:8101",
             "http://127.0.0.1:5173",
             "http://127.0.0.1:5174",
             "http://127.0.0.1:5175",
             "http://127.0.0.1:5176",
             "http://127.0.0.1:5177",
             "http://127.0.0.1:5178",
+            "http://127.0.0.1:8100",
+            "http://127.0.0.1:8101",
+            "http://localhost",
+            "https://localhost",
+            "capacitor://localhost",
+            "ionic://localhost",
             "http://localhost:8080"
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));

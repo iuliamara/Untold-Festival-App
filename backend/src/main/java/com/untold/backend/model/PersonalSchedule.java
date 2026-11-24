@@ -35,4 +35,7 @@ public class PersonalSchedule {
 
     @Column(name = "alarm_offset", nullable = false)
     private Integer alarmOffset = 10;
+
+    @Column(name = "client_request_id", length = 36)
+    private String clientRequestId;
 }

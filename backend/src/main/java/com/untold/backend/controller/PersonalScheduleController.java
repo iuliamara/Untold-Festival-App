@@ -42,7 +42,29 @@ public class PersonalScheduleController {
         if (user == null) {
             return unauthorized();
         }
-        return ResponseEntity.ok(ApiResponse.success("Slot added to schedule", scheduleService.addSlot(user, request)));
+        try {
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(ApiResponse.success("Slot added to schedule", scheduleService.addSlot(user, request)));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<PersonalScheduleDto>> updateSlot(
+            Authentication authentication, @PathVariable Long id, @RequestBody PersonalScheduleRequest request) {
+        User user = resolveUser(authentication);
+        if (user == null) {
+            return unauthorized();
+        }
+        try {
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Slot updated", scheduleService.updateSlot(user.getId(), id, request)));
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.notFound(e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
     }
 
     @PutMapping("/{id}/alarm")
@@ -56,6 +78,8 @@ public class PersonalScheduleController {
             return ResponseEntity.ok(ApiResponse.success(scheduleService.updateAlarmOffset(user.getId(), id, offset)));
         } catch (ResourceNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.notFound(e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 

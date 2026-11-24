@@ -60,6 +60,7 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -73,7 +74,9 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -86,10 +89,15 @@ interface UntoldAdminApi {
     suspend fun login(@Body request: LoginRequest): Response<ApiResponse<AuthResponse>>
 
     @POST("api/tickets/validate-qr")
-    suspend fun validateQr(@Body request: QrRequest): Response<QrValidationResponse>
+    suspend fun validateQr(
+        @Header("Authorization") authorization: String,
+        @Body request: QrRequest
+    ): Response<QrValidationResponse>
 
     @GET("api/tickets/stats/entrances-today")
-    suspend fun getTodayEntranceStats(): Response<EntranceStatsResponse>
+    suspend fun getTodayEntranceStats(
+        @Header("Authorization") authorization: String
+    ): Response<EntranceStatsResponse>
 }
 
 data class LoginRequest(val email: String, val password: String)
@@ -104,6 +112,8 @@ data class AuthResponse(
     val token: String?,
     val user: UserResponse?
 )
+
+data class AdminSession(val username: String, val token: String)
 
 data class UserResponse(
     val id: Long,
@@ -199,31 +209,59 @@ val UntoldGradient = Brush.linearGradient(
 
 private enum class AdminScreen { SCANNER, STATS }
 
+private fun authenticationErrorMessage(status: Int?): String? = when (status) {
+    401 -> "Sesiunea a expirat sau nu mai este validă. Autentificați-vă din nou."
+    403 -> "Acces interzis. Autentificați-vă din nou cu un cont de administrator."
+    else -> null
+}
+
 @Composable
 fun MainNavigation(sharedPreferences: SharedPreferences, cameraExecutor: ExecutorService) {
-    var savedUser by remember { mutableStateOf(sharedPreferences.getString("admin_user", null)) }
+    var session by remember {
+        val username = sharedPreferences.getString("admin_user", null)
+        val token = sharedPreferences.getString("admin_token", null)
+        mutableStateOf(
+            if (username.isNullOrBlank() || token.isNullOrBlank()) null
+            else AdminSession(username, token)
+        )
+    }
+    var loginMessage by remember { mutableStateOf<String?>(null) }
     var currentScreen by remember { mutableStateOf(AdminScreen.SCANNER) }
+    val endSession: (String?) -> Unit = { message ->
+        sharedPreferences.edit().remove("admin_user").remove("admin_token").apply()
+        session = null
+        currentScreen = AdminScreen.SCANNER
+        loginMessage = message
+    }
+    val activeSession = session
 
-    if (savedUser == null) {
+    if (activeSession == null) {
         AdminLoginScreen(
-            onLoginSuccess = { username ->
-                sharedPreferences.edit().putString("admin_user", username).apply()
-                savedUser = username
+            sessionMessage = loginMessage,
+            onLoginSuccess = { authenticatedSession ->
+                sharedPreferences.edit()
+                    .putString("admin_user", authenticatedSession.username)
+                    .putString("admin_token", authenticatedSession.token)
+                    .apply()
+                loginMessage = null
+                currentScreen = AdminScreen.SCANNER
+                session = authenticatedSession
             }
         )
     } else if (currentScreen == AdminScreen.STATS) {
         AdminStatsScreen(
+            authToken = activeSession.token,
+            onAuthenticationFailed = { endSession(it) },
             onBack = { currentScreen = AdminScreen.SCANNER }
         )
     } else {
         AdminScannerScreen(
-            adminName = savedUser!!,
+            adminName = activeSession.username,
+            authToken = activeSession.token,
             cameraExecutor = cameraExecutor,
             onShowStats = { currentScreen = AdminScreen.STATS },
-            onLogout = {
-                sharedPreferences.edit().remove("admin_user").apply()
-                savedUser = null
-            }
+            onAuthenticationFailed = { endSession(it) },
+            onLogout = { endSession(null) }
         )
     }
 }
@@ -233,12 +271,12 @@ fun MainNavigation(sharedPreferences: SharedPreferences, cameraExecutor: Executo
 // ==========================================
 
 @Composable
-fun AdminLoginScreen(onLoginSuccess: (String) -> Unit) {
+fun AdminLoginScreen(sessionMessage: String?, onLoginSuccess: (AdminSession) -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var errorMessage by remember(sessionMessage) { mutableStateOf(sessionMessage) }
     
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -369,17 +407,25 @@ fun AdminLoginScreen(onLoginSuccess: (String) -> Unit) {
                                     RetrofitClient.api.login(LoginRequest(email, password))
                                 }
                                 if (response.isSuccessful) {
-                                    val user = response.body()?.data?.user
-                                    if (user != null) {
-                                        onLoginSuccess(user.username)
+                                    val result = response.body()
+                                    val user = result?.data?.user
+                                    val token = result?.data?.token
+                                    if (result?.type == "SUCCESS" && user != null && !token.isNullOrBlank()) {
+                                        if (user.userType == "ADMIN") {
+                                            onLoginSuccess(AdminSession(user.username, token))
+                                        } else {
+                                            errorMessage = "Acces interzis. Doar administratorii au acces."
+                                        }
                                     } else {
-                                        errorMessage = "Eroare la parsarea datelor utilizatorului."
+                                        errorMessage = "Serverul nu a returnat o sesiune validă. Autentificați-vă din nou."
                                     }
                                 } else if (response.code() == 403) {
                                     errorMessage = "Acces interzis. Doar administratorii au acces."
                                 } else {
                                     errorMessage = "Date de logare incorecte sau server offline."
                                 }
+                            } catch (e: CancellationException) {
+                                throw e
                             } catch (e: Exception) {
                                 Log.e("LoginError", "Request failed", e)
                                 errorMessage = "Eroare de rețea. Verificați conexiunea."
@@ -388,6 +434,7 @@ fun AdminLoginScreen(onLoginSuccess: (String) -> Unit) {
                             }
                         }
                     },
+                    enabled = !isLoading,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
@@ -412,8 +459,10 @@ fun AdminLoginScreen(onLoginSuccess: (String) -> Unit) {
 @Composable
 fun AdminScannerScreen(
     adminName: String,
+    authToken: String,
     cameraExecutor: ExecutorService,
     onShowStats: () -> Unit,
+    onAuthenticationFailed: (String) -> Unit,
     onLogout: () -> Unit
 ) {
     var scannerState by remember { mutableStateOf<ScannerState>(ScannerState.Idle) }
@@ -446,9 +495,15 @@ fun AdminScannerScreen(
                     coroutineScope.launch {
                         try {
                             val response = withContext(Dispatchers.IO) {
-                                RetrofitClient.api.validateQr(QrRequest(rfid, scanDirection.name))
+                                RetrofitClient.api.validateQr(
+                                    "Bearer $authToken",
+                                    QrRequest(rfid, scanDirection.name)
+                                )
                             }
-                            if (response.isSuccessful) {
+                            val authenticationError = authenticationErrorMessage(response.code())
+                            if (authenticationError != null) {
+                                onAuthenticationFailed(authenticationError)
+                            } else if (response.isSuccessful) {
                                 val validation = response.body()
                                 if (validation != null && validation.success) {
                                     scannerState = ScannerState.Success(
@@ -462,8 +517,12 @@ fun AdminScannerScreen(
                                     )
                                 }
                             } else {
-                                scannerState = ScannerState.Failure(message = "Eroare rețea sau cod invalid")
+                                scannerState = ScannerState.Failure(
+                                    message = "Eroare server (HTTP ${response.code()}). Încercați din nou."
+                                )
                             }
+                        } catch (e: CancellationException) {
+                            throw e
                         } catch (e: Exception) {
                             Log.e("ScannerError", "Verification failed", e)
                             scannerState = ScannerState.Failure(message = "Eroare conexiune server")
@@ -575,54 +634,83 @@ fun AdminScannerScreen(
 private const val SSE_RECONNECT_DELAY_MS = 5_000L
 
 @Composable
-fun AdminStatsScreen(onBack: () -> Unit) {
+fun AdminStatsScreen(
+    authToken: String,
+    onAuthenticationFailed: (String) -> Unit,
+    onBack: () -> Unit
+) {
     var entriesToday by remember { mutableStateOf<Long?>(null) }
     var connected by remember { mutableStateOf(false) }
     // Bumping this re-runs the DisposableEffect below, i.e. opens a fresh SSE connection.
     var connectionAttempt by remember { mutableStateOf(0) }
     val coroutineScope = rememberCoroutineScope()
+    val currentOnAuthenticationFailed by rememberUpdatedState(onAuthenticationFailed)
 
     // Live stream: the backend pushes a Server-Sent-Event (fed by Kafka) on every gate scan, so
     // the number updates the instant someone enters or leaves — no polling interval.
-    DisposableEffect(connectionAttempt) {
+    DisposableEffect(authToken, connectionAttempt) {
+        val disposed = AtomicBoolean(false)
+        val reconnectScheduled = AtomicBoolean(false)
         val client = OkHttpClient.Builder()
             .readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS) // SSE stays open indefinitely
             .build()
         val request = okhttp3.Request.Builder()
             .url("http://10.0.2.2:8080/api/stream/entrance-stats")
             .header("Accept", "text/event-stream")
+            .header("Authorization", "Bearer $authToken")
             .build()
+
+        fun reconnect() {
+            if (disposed.get() || !reconnectScheduled.compareAndSet(false, true)) return
+            coroutineScope.launch {
+                if (disposed.get()) return@launch
+                connected = false
+                delay(SSE_RECONNECT_DELAY_MS)
+                if (!disposed.get()) connectionAttempt++
+            }
+        }
 
         val eventSource = EventSources.createFactory(client).newEventSource(request, object : EventSourceListener() {
             override fun onOpen(eventSource: EventSource, response: okhttp3.Response) {
-                connected = true
+                coroutineScope.launch {
+                    if (!disposed.get()) connected = true
+                }
             }
 
             override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
                 Regex("\"entriesInside\"\\s*:\\s*(-?\\d+)").find(data)
                     ?.groupValues?.get(1)?.toLongOrNull()
-                    ?.let { entriesToday = it }
+                    ?.let { count ->
+                        coroutineScope.launch {
+                            if (!disposed.get()) entriesToday = count
+                        }
+                    }
             }
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: okhttp3.Response?) {
                 Log.e("StatsSSE", "Entrance stats stream failed", t)
-                connected = false
-                coroutineScope.launch {
-                    delay(SSE_RECONNECT_DELAY_MS)
-                    connectionAttempt++
+                val authenticationError = authenticationErrorMessage(response?.code)
+                if (authenticationError != null) {
+                    reconnectScheduled.set(true)
+                    coroutineScope.launch {
+                        if (!disposed.get()) {
+                            connected = false
+                            disposed.set(true)
+                            currentOnAuthenticationFailed(authenticationError)
+                        }
+                    }
+                } else {
+                    reconnect()
                 }
             }
 
             override fun onClosed(eventSource: EventSource) {
-                connected = false
-                coroutineScope.launch {
-                    delay(SSE_RECONNECT_DELAY_MS)
-                    connectionAttempt++
-                }
+                reconnect()
             }
         })
 
         onDispose {
+            disposed.set(true)
             eventSource.cancel()
             client.dispatcher.executorService.shutdown()
         }
